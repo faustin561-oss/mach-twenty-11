@@ -1,0 +1,36 @@
+# Not required for local development anymore — the app defaults to a
+# local SQLite file (prisma/dev.db) with zero setup; see .env.example.
+# This file is kept for later, if/when moving to Postgres for a real
+# production deployment (see the comment in prisma/schema.prisma for
+# exactly what that migration involves — it's small and isolated).
+version: "3.9"
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file: .env
+    depends_on:
+      - postgres
+      - redis
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mach2011
+      POSTGRES_PASSWORD: mach2011
+      POSTGRES_DB: mach2011
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+volumes:
+  pgdata:

@@ -1,0 +1,44 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --m20-navy: #0B1F3A;
+  --m20-steel: #1E3A5F;
+  --m20-amber: #FF8A00;
+  --m20-fog: #F5F6F8;
+  --m20-ink: #10151C;
+
+  /* Homepage-only design system — additive, does not replace the tokens
+     above (dashboard/loadboard/carrier pages still use m20navy/m20amber). */
+  --hp-ink: #0A1424;
+  --hp-navy: #0F2038;
+  --hp-navy-soft: #16294a;
+  --hp-steel: #2C4560;
+  --hp-cyan: #2BB4D4;
+  --hp-cyan-deep: #12839E;
+  --hp-cyan-soft: #8FE0F0;
+  --hp-fog: #F5F7FA;
+  --hp-line: rgba(255, 255, 255, 0.12);
+  --hp-line-dark: rgba(10, 20, 36, 0.09);
+}
+
+html, body { height: 100%; }
+body { background: var(--m20-fog); color: var(--m20-ink); }
+
+.hp-display { font-family: 'Space Grotesk', 'Inter', sans-serif; }
+.hp-body { font-family: 'Inter', sans-serif; }
+.hp-mono { font-family: 'IBM Plex Mono', monospace; }
+
+@keyframes hp-dash {
+  to { stroke-dashoffset: -400; }
+}
+@keyframes hp-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hp-motion { animation: none !important; }
+}
+

@@ -1,0 +1,561 @@
+// Mach Twenty 11 — PRODUCTION schema (Postgres).
+//
+// This is the deployment counterpart to prisma/schema.prisma (SQLite,
+// used for local dev/preview — no external DB server needed there).
+// Prisma does not support a dynamic/env-driven `provider` value — only
+// the connection `url` can come from an environment variable, so two
+// schema files is the actual mechanism for "SQLite locally, Postgres in
+// production," not a workaround.
+//
+// UNLIKE earlier versions of this file, this one restores real Postgres
+// native types instead of the SQLite-era String workarounds:
+//   - 8 real Prisma enums (UserRole, ShipmentMode, ShipmentStatus,
+//     DocumentType, PaymentStatus, VehicleStatus, DriverStatus,
+//     DisputeStatus) instead of String fields.
+//   - Native String[] arrays for CarrierProfile.equipmentTypes/
+//     operatingAreas and Shipment.photos, instead of JSON-encoded strings.
+//   - Native Json for SavedSearch.filters, instead of a JSON-encoded string.
+//
+// Why this is safe for enums specifically, and why arrays/Json needed
+// more than just a type change:
+//   - Enums: Prisma's classic client (prisma-client-js, what this project
+//     uses) always represents enum values as plain JS strings at
+//     runtime — "OPEN_FOR_BIDS" is "OPEN_FOR_BIDS" whether the field is
+//     declared `enum` or `String`. Zero application code needed to
+//     change for this part.
+//   - Arrays/Json: a native String[]/Json field hands back a real array/
+//     object directly from Prisma; the SQLite-schema version hands back
+//     a JSON-encoded string that the app parses manually
+//     (src/lib/json-array.ts, src/lib/json-filters.ts). Deploying this
+//     schema without updating those helpers would have silently
+//     corrupted data the first time someone read one of these fields in
+//     production (JSON.parse on an already-parsed array fails, gets
+//     swallowed by the helper's try/catch, silently returns an empty
+//     array/object instead of the real data). Fixed by making those
+//     helpers check the actual runtime type of the value before
+//     deciding whether to parse — see the comments in both files. This
+//     means the exact same call sites in application code work
+//     correctly against either schema without an environment branch
+//     scattered through the app.
+//
+// Real, disclosed residual risk: this project's tsconfig.json uses
+// "strict": true. Having one application codebase type-check against
+// two differently-shaped generated Prisma clients (this file's native
+// types vs. schema.prisma's String-based types) is not a configuration
+// Prisma is designed around, and I have no way to generate a real
+// client from this file and run the actual TypeScript compiler against
+// it — only a stubbed check that treats @prisma/client loosely and
+// would not catch a real strict-mode mismatch here. This is the single
+// highest-risk change in this file; if `next build` (using
+// generate:production) reports type errors on the ~5 call sites in
+// src/lib/json-array.ts, src/lib/json-filters.ts, or the API routes that
+// use them, that is the expected place to look first.
+//
+// Used via the *:production npm scripts (see package.json), which pass
+// --schema=prisma/schema.production.prisma explicitly:
+//   npm run generate:production
+//   npm run db:push:production      (quick sync, no migration history)
+//   npm run db:migrate:production   (prisma migrate deploy — see the
+//                                     note in DEPLOYMENT.md: this
+//                                     requires a migration history that
+//                                     only gets created by running
+//                                     `prisma migrate dev --name init
+//                                     --schema=prisma/schema.production.prisma`
+//                                     once, by hand, against a real
+//                                     reachable Postgres instance — I
+//                                     cannot generate verified migration
+//                                     SQL without a live database
+//                                     connection, and have not
+//                                     fabricated migration files
+//                                     pretending otherwise)
+//   npm run build:production
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  GUEST
+  CUSTOMER
+  CARRIER
+  BROKER
+  DISPATCHER
+  FLEET_MANAGER
+  ENTERPRISE
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum ShipmentMode {
+  LTL
+  FTL
+  OCEAN_FCL
+  OCEAN_LCL
+  AIR
+  RAIL
+  VEHICLE
+  BOAT
+  HOUSEHOLD_MOVING
+  HEAVY_EQUIPMENT
+  AGRICULTURE
+  CONSTRUCTION
+  MEDICAL
+  COURIER
+  SPECIALTY
+}
+
+enum ShipmentStatus {
+  DRAFT
+  OPEN_FOR_BIDS
+  BIDS_REVEALED
+  AWARDED
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+  DISPUTED
+}
+
+enum DocumentType {
+  BILL_OF_LADING
+  SEA_WAYBILL
+  AIR_WAYBILL
+  PROOF_OF_PICKUP
+  PROOF_OF_DELIVERY
+  INSURANCE_CERT
+  CARRIER_AUTHORITY
+  W9
+  DAMAGE_REPORT
+  INVOICE
+}
+
+enum PaymentStatus {
+  PENDING
+  ESCROWED
+  RELEASED
+  REFUNDED
+  FAILED
+}
+
+enum VehicleStatus {
+  ACTIVE
+  MAINTENANCE
+  OUT_OF_SERVICE
+}
+
+enum DriverStatus {
+  AVAILABLE
+  ON_ROUTE
+  OFF_DUTY
+}
+
+enum DisputeStatus {
+  OPEN
+  RESOLVED_RELEASE
+  RESOLVED_REFUND
+  REJECTED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  UNPAID
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+  TRIALING
+  PAUSED
+}
+
+enum TransactionType {
+  MEMBERSHIP
+  URGENT_FEE
+  PLATFORM_FEE
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String?
+  name          String
+  role          UserRole  @default(CUSTOMER)
+  phone         String?
+  emailVerified DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  carrierProfile   CarrierProfile?
+  shipmentsPosted  Shipment[]        @relation("ShipperShipments")
+  bids             Bid[]
+  documents        Document[]
+  payments         Payment[]
+  notifications    Notification[]
+  sentMessages     Message[]         @relation("SentMessages")
+  savedSearches    SavedSearch[]
+  disputesRaised   Dispute[]
+  invoices         Invoice[]
+  transactions     Transaction[]
+  reviewsGiven     Review[]      @relation("ReviewsGiven")
+  reviewsReceived  Review[]      @relation("ReviewsReceived")
+  auditLogs        AuditLog[]
+  emailVerificationTokens EmailVerificationToken[]
+  passwordResetTokens     PasswordResetToken[]
+
+  @@index([role])
+}
+
+model CarrierProfile {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  legalName        String
+  dotNumber        String?
+  mcNumber         String?
+  insuranceOnFile  Boolean  @default(false)
+  equipmentTypes   String[]
+  operatingAreas   String[]
+  rating           Float    @default(0)
+  membershipActive Boolean  @default(false)
+  membershipTier   String   @default("none")
+  stripeAccountId       String?
+  stripeCustomerId      String?
+  stripeSubscriptionId  String?
+  verifiedAt       DateTime?
+  createdAt        DateTime @default(now())
+
+  vehicles Vehicle[]
+  drivers  Driver[]
+  subscription Subscription?
+
+  @@index([dotNumber])
+  @@index([mcNumber])
+}
+
+model Vehicle {
+  id               String         @id @default(cuid())
+  carrierProfileId String
+  carrierProfile   CarrierProfile @relation(fields: [carrierProfileId], references: [id], onDelete: Cascade)
+  unitNumber       String
+  type             String
+  make             String?
+  model            String?
+  year             Int?
+  vin              String?
+  plate            String?
+  status           VehicleStatus  @default(ACTIVE)
+  assignedDriverId String?
+  assignedDriver   Driver?        @relation(fields: [assignedDriverId], references: [id])
+  createdAt        DateTime       @default(now())
+
+  @@unique([carrierProfileId, unitNumber])
+  @@index([carrierProfileId])
+}
+
+model Driver {
+  id               String         @id @default(cuid())
+  carrierProfileId String
+  carrierProfile   CarrierProfile @relation(fields: [carrierProfileId], references: [id], onDelete: Cascade)
+  name             String
+  phone            String?
+  cdlNumber        String?
+  cdlExpiresAt     DateTime?
+  status           DriverStatus   @default(AVAILABLE)
+  vehicles         Vehicle[]
+  createdAt        DateTime       @default(now())
+
+  @@index([carrierProfileId])
+}
+
+model Shipment {
+  id             String         @id @default(cuid())
+  refSeq         Int            @unique @default(autoincrement()) // human-readable ref = MT11-{createdAt.year}-{refSeq padded to 6} — see src/lib/shipment-ref.ts. Global sequence, not per-year, so it's collision-free without a transaction/lock.
+  shipperId      String
+  shipper        User           @relation("ShipperShipments", fields: [shipperId], references: [id])
+  mode           ShipmentMode
+  status         ShipmentStatus @default(DRAFT)
+  isUrgent       Boolean        @default(false)
+  urgentFeeStatus TransactionStatus?
+  originAddress  String
+  originLat      Float?
+  originLng      Float?
+  destAddress    String
+  destLat        Float?
+  destLng        Float?
+  cargoDescription String
+  weightLb       Float
+  dimensions     String?
+  hazmat         Boolean        @default(false)
+  fragile        Boolean        @default(false)
+  tempControlled Boolean        @default(false)
+  insuranceValue Float?
+  pickupWindowStart DateTime
+  pickupWindowEnd   DateTime?
+  deliveryWindowStart DateTime?
+  deliveryWindowEnd   DateTime?
+  bidDeadline    DateTime
+  photos         String[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  bids       Bid[]
+  documents  Document[]
+  payment    Payment?
+  messages   Message[]
+  disputes   Dispute[]
+  transactions Transaction[]
+  reviews    Review[]
+
+  @@index([status])
+  @@index([mode])
+  @@index([shipperId])
+}
+
+model Bid {
+  id           String   @id @default(cuid())
+  shipmentId   String
+  shipment     Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  carrierId    String
+  carrier      User     @relation(fields: [carrierId], references: [id])
+  amount       Float
+  etaDays      Int
+  message      String?
+  isCounter    Boolean  @default(false)
+  parentBidId  String?
+  won          Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  @@unique([shipmentId, carrierId])
+  @@index([shipmentId])
+  @@index([carrierId])
+}
+
+model Document {
+  id         String       @id @default(cuid())
+  shipmentId String
+  shipment   Shipment     @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  uploadedById String
+  uploadedBy User         @relation(fields: [uploadedById], references: [id])
+  type       DocumentType
+  fileUrl    String
+  docNumber  String?
+  createdAt  DateTime     @default(now())
+
+  @@index([shipmentId])
+  @@index([type])
+}
+
+model Payment {
+  id             String        @id @default(cuid())
+  shipmentId     String        @unique
+  shipment       Shipment      @relation(fields: [shipmentId], references: [id])
+  payerId        String
+  payer          User          @relation(fields: [payerId], references: [id])
+  amount         Float
+  platformFee    Float
+  status         PaymentStatus @default(PENDING)
+  stripePaymentIntentId String?
+  stripeTransferId      String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+// Stripe subscription lifecycle for carrier membership ($19.99/mo — see
+// src/lib/stripe.ts for the single source of truth on pricing). This is
+// the detail record; CarrierProfile.membershipActive/membershipTier stay
+// as a denormalized quick-check cache kept in sync by the webhook
+// handler (src/app/api/stripe/webhook/route.ts), so existing bid-gating
+// code that reads those two fields keeps working unchanged.
+model Subscription {
+  id                   String   @id @default(cuid())
+  carrierProfileId     String   @unique
+  carrierProfile       CarrierProfile @relation(fields: [carrierProfileId], references: [id], onDelete: Cascade)
+  stripeSubscriptionId String   @unique
+  stripePriceId        String
+  status               SubscriptionStatus @default(INCOMPLETE)
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([status])
+}
+
+// Mirrors Stripe invoices for the billing dashboard's invoice/receipt
+// history — one row per Stripe invoice event, not regenerated locally.
+model Invoice {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id])
+  stripeInvoiceId   String   @unique
+  amount            Float
+  status            String   // Stripe's own invoice status string (paid, open, void, uncollectible)
+  hostedInvoiceUrl  String?
+  invoicePdfUrl     String?
+  periodStart       DateTime?
+  periodEnd         DateTime?
+  createdAt         DateTime @default(now())
+
+  @@index([userId])
+}
+
+// Idempotency ledger for Stripe webhooks — every event's `id` is checked
+// against this table before processing; already-seen events are
+// acknowledged (200) without reprocessing. Required because Stripe can
+// and does deliver the same webhook event more than once.
+model WebhookEvent {
+  id             String   @id @default(cuid())
+  stripeEventId  String   @unique
+  type           String
+  processedAt    DateTime @default(now())
+}
+
+// Unified ledger for one-off charges that aren't the recurring
+// membership subscription (Invoice covers that) or shipment escrow
+// (Payment covers that): urgent-quote fees and platform-fee line items,
+// for a single place the billing dashboard can query "transaction
+// history" from. (Not implementing a separate "BillingHistory" table —
+// see README: that would just be a denormalized copy of Invoice +
+// Transaction + Payment and risks drifting from the real records; the
+// billing dashboard queries this table and the other two directly.)
+model Transaction {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  shipmentId    String?
+  shipment      Shipment? @relation(fields: [shipmentId], references: [id])
+  type          TransactionType
+  status        TransactionStatus @default(PENDING)
+  amount        Float
+  stripePaymentIntentId String?
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+  @@index([shipmentId])
+}
+
+model Review {
+  id         String   @id @default(cuid())
+  shipmentId String
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  raterId    String
+  rater      User     @relation("ReviewsGiven", fields: [raterId], references: [id])
+  rateeId    String
+  ratee      User     @relation("ReviewsReceived", fields: [rateeId], references: [id])
+  rating     Int      // 1-5, validated at the application layer (zod) — see src/app/api/shipments/[id]/reviews/route.ts
+  comment    String?
+  createdAt  DateTime @default(now())
+
+  @@unique([shipmentId, raterId]) // one review per shipment per rater
+  @@index([rateeId])
+}
+
+// Admin-action and payment-action audit trail — every write covered by
+// this is listed in src/lib/audit.ts, which is the single place new
+// audited actions get added rather than scattering ad hoc logging calls.
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?  // null for system/webhook-initiated actions
+  actor      User?    @relation(fields: [actorId], references: [id])
+  action     String   // e.g. "dispute.resolve", "subscription.canceled", "shipment.award"
+  targetType String   // e.g. "Shipment", "Dispute", "Subscription"
+  targetId   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([targetType, targetId])
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique // SHA-256 of the token — the raw token is never stored, only emailed
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique // SHA-256 of the token — same reasoning as EmailVerificationToken
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model SavedSearch {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  filters   Json
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model NewsletterSubscriber {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  confirmed     Boolean   @default(false)
+  unsubscribedAt DateTime?
+  createdAt     DateTime  @default(now())
+}
+
+model Dispute {
+  id          String        @id @default(cuid())
+  shipmentId  String
+  shipment    Shipment      @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  raisedById  String
+  raisedBy    User          @relation(fields: [raisedById], references: [id])
+  reason      String
+  status      DisputeStatus @default(OPEN)
+  resolution  String?
+  resolvedById String?
+  createdAt   DateTime      @default(now())
+  resolvedAt  DateTime?
+
+  @@index([shipmentId])
+  @@index([status])
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  shipmentId String
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  senderId   String
+  sender     User     @relation("SentMessages", fields: [senderId], references: [id])
+  body       String
+  createdAt  DateTime @default(now())
+
+  @@index([shipmentId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
+}
