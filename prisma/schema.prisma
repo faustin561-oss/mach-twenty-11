@@ -145,7 +145,7 @@ model Driver {
 
 model Shipment {
   id             String         @id @default(cuid())
-  refSeq         Int            @unique @default(autoincrement()) // human-readable ref = MT11-{createdAt.year}-{refSeq padded to 6} — see src/lib/shipment-ref.ts. Global sequence, not per-year, so it's collision-free without a transaction/lock.
+  refSeq         Int            @unique // human-readable ref = MT11-{createdAt.year}-{refSeq padded to 6} — see src/lib/shipment-ref.ts. Assigned via an atomic Counter-table transaction at creation time (see nextShipmentRefSeq()), not a DB-level autoincrement — SQLite fundamentally cannot autoincrement a non-primary-key column (only Postgres supports that, via sequences), so this needed to be portable across both schemas rather than diverge between them.
   shipperId      String
   shipper        User           @relation("ShipperShipments", fields: [shipperId], references: [id])
   mode           String         // see src/lib/enums.ts: ShipmentMode
@@ -425,4 +425,15 @@ model Notification {
   createdAt DateTime @default(now())
 
   @@index([userId, read])
+}
+
+// Portable atomic counter — replaces DB-level autoincrement (which
+// SQLite cannot do on a non-primary-key column) for Shipment.refSeq.
+// One row per named sequence; incremented inside a transaction (see
+// src/lib/shipment-ref.ts's nextShipmentRefSeq()), which is what makes
+// it collision-free under concurrent shipment creation on either
+// database engine, not a DB-specific feature.
+model Counter {
+  name  String @id
+  value Int    @default(0)
 }

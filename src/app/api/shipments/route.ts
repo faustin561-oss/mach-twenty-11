@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { handleApiError } from "@/lib/api-error";
 import { toJsonArray } from "@/lib/json-array";
+import { nextShipmentRefSeq } from "@/lib/shipment-ref";
 
 const createShipmentSchema = z.object({
   mode: z.enum([
@@ -79,10 +80,12 @@ export async function POST(req: NextRequest) {
     }
 
     const { photos, ...rest } = parsed.data;
+    const refSeq = await nextShipmentRefSeq();
     const shipment = await prisma.shipment.create({
       data: {
         shipperId: (session.user as any).id,
         status: "OPEN_FOR_BIDS",
+        refSeq,
         ...rest,
         photos: toJsonArray(photos || []) as any,
         pickupWindowStart: new Date(parsed.data.pickupWindowStart),

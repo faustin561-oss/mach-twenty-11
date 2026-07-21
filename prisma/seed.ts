@@ -63,9 +63,19 @@ async function main() {
 
   const existingSample = await prisma.shipment.findFirst({ where: { shipperId: shipper.id } });
   if (!existingSample) {
+    // refSeq is no longer a DB-level autoincrement (SQLite can't do that
+    // on a non-primary-key column — see prisma/schema.prisma) — same
+    // atomic Counter-table pattern as src/lib/shipment-ref.ts, inlined
+    // here for the same reason the JSON-array handling above is inlined.
+    const counter = await prisma.counter.upsert({
+      where: { name: "shipment_ref" },
+      update: { value: { increment: 1 } },
+      create: { name: "shipment_ref", value: 1 },
+    });
     await prisma.shipment.create({
       data: {
         shipperId: shipper.id,
+        refSeq: counter.value,
         mode: "FTL", // see src/lib/enums.ts: ShipmentMode
         status: "OPEN_FOR_BIDS", // see src/lib/enums.ts: ShipmentStatus
         originAddress: "Tampa, FL",
