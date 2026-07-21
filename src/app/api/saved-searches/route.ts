@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -18,7 +18,7 @@ export async function GET() {
     // filters is stored as a JSON-encoded string (see prisma/schema.prisma
     // comment); deserialize before returning so the client contract
     // (LoadBoardClient.tsx expects an object) is unchanged.
-    const withParsedFilters = searches.map((s) => ({ ...s, filters: fromJsonFilters(s.filters) }));
+    const withParsedFilters = searches.map((s) => ({ ...s, filters: fromJsonFilters(s.filters as unknown as string | Record<string, any> | null | undefined) }));
     return NextResponse.json({ searches: withParsedFilters });
 
   } catch (err) {
@@ -42,3 +42,4 @@ export async function POST(req: NextRequest) {
     return handleApiError(err);
   }
 }
+
