@@ -13,7 +13,7 @@ export function toJsonFilters(filters: Record<string, any>): Record<string, any>
   return JSON.stringify(filters ?? {});
 }
 
-export function fromJsonFilters(value: Record<string, any> | string | null | undefined): Record<string, any> {
+export function fromJsonFilters(value: any): Record<string, any> {
   if (!value) return {};
   if (typeof value === "object") return value; // already parsed (Postgres)
   try {
