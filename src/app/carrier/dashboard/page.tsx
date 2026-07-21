@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import type { Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { ConnectPayoutButton, DeliverButton } from "@/components/CarrierActions";
 import AppShell from "@/components/AppShell";
@@ -12,14 +11,6 @@ import { safeDbCall } from "@/lib/safe-db";
 // the page into the shared AppShell (nav/notifications now live there).
 // GPS tracking, POD upload, and AI dispatch suggestions are not built yet;
 // see README roadmap.
-
-type CarrierProfileWithFleet = Prisma.CarrierProfileGetPayload<{
-  include: { vehicles: true; drivers: true };
-}>;
-
-type WonBidWithShipment = Prisma.BidGetPayload<{
-  include: { shipment: true };
-}>;
 export default async function CarrierDashboardPage() {
   const session = await auth();
   if (!session?.user || (session.user as any).role !== "CARRIER") {
@@ -33,12 +24,12 @@ export default async function CarrierDashboardPage() {
         prisma.carrierProfile.findUnique({ where: { userId }, include: { vehicles: true, drivers: true } }),
         prisma.bid.findMany({ where: { carrierId: userId, won: true }, include: { shipment: true }, orderBy: { createdAt: "desc" } }),
       ]),
-    [null, []] as [CarrierProfileWithFleet | null, WonBidWithShipment[]]
+    [null, []] as any // see the note in shipments/[id]/page.tsx — ReturnType<typeof prisma.X> is the base overload, not this query's actual include-aware shape
   );
   const [profile, wonBids] = data;
 
-  const revenue = wonBids.reduce((sum, b) => sum + b.amount, 0);
-  const activeLoads = wonBids.filter((b) => !["DELIVERED", "CANCELLED"].includes(b.shipment.status));
+  const revenue = wonBids.reduce((sum: number, b: any) => sum + b.amount, 0);
+  const activeLoads = wonBids.filter((b: any) => !["DELIVERED", "CANCELLED"].includes(b.shipment.status));
 
   return (
     <AppShell role="CARRIER" breadcrumbs={[{ label: "Carrier Dashboard" }]}>
@@ -81,7 +72,7 @@ export default async function CarrierDashboardPage() {
             <h2 className="mt-10 text-lg font-semibold">Assigned Loads</h2>
             <div className="mt-4 space-y-3">
               {activeLoads.length === 0 && <p className="text-sm text-black/50">No assigned loads yet.</p>}
-              {activeLoads.map((b) => (
+              {activeLoads.map((b: any) => (
                 <div key={b.id} className="rounded-lg border border-black/10 bg-white p-4">
                   <div className="flex items-center justify-between">
                     <div className="font-medium">{b.shipment.originAddress} → {b.shipment.destAddress}</div>
@@ -102,7 +93,7 @@ export default async function CarrierDashboardPage() {
               <Link href="/carrier/fleet" className="text-sm font-medium text-m20navy underline">Manage fleet</Link>
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              {(profile?.vehicles ?? []).slice(0, 4).map((v) => (
+              {(profile?.vehicles ?? []).slice(0, 4).map((v: any) => (
                 <div key={v.id} className="rounded-lg border border-black/10 bg-white p-4 text-sm">
                   <div className="font-medium">{v.unitNumber} · {v.type}</div>
                   <div className="text-black/50">{v.status}</div>
