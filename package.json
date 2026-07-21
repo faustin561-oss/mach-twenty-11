@@ -9,7 +9,7 @@
     "predev": "node scripts/check-env.js && node scripts/db-sync.js push",
     "prebuild": "node scripts/check-env.js && node scripts/db-sync.js push",
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/db-sync.js generate && next build",
     "start": "next start",
     "lint": "eslint .",
     "db:generate": "prisma generate",
