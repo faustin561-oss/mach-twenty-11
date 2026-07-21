@@ -31,7 +31,7 @@ export default async function ShipmentDetailPage({ params }: { params: Promise<{
           disputes: { orderBy: { createdAt: "desc" }, take: 1 },
         },
       }),
-    null as Awaited<ReturnType<typeof prisma.shipment.findUnique>>
+    null as any // (see safe-db.ts fix note: ReturnType<typeof prisma.X> resolves to the base/no-relations overload, not this query's actual include-aware shape — casting to any here lets T infer correctly from the real query instead)
   );
 
   if (dbUnavailable) {

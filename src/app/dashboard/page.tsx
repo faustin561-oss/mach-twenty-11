@@ -20,7 +20,7 @@ export default async function DashboardPage() {
         orderBy: { createdAt: "desc" },
         include: { _count: { select: { bids: true } } },
       }),
-    [] as Awaited<ReturnType<typeof prisma.shipment.findMany>>
+    [] as any // see the note in shipments/[id]/page.tsx — ReturnType<typeof prisma.X> is the base overload, not this query's actual include-aware shape
   );
 
   return (

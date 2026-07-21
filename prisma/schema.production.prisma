@@ -225,8 +225,20 @@ model CarrierProfile {
   equipmentTypes   String[]
   operatingAreas   String[]
   rating           Float    @default(0)
+  // membershipActive is a derived convenience flag kept in sync by the
+  // Stripe webhook handler — the source of truth is subscriptionStatus,
+  // which mirrors Stripe's own subscription status values exactly.
+  // These three fields were missing from this file entirely (a real
+  // schema-sync gap, caught by a Vercel TypeScript build error: the
+  // webhook handler and src/app/api/billing/route.ts both read/write
+  // them, but only prisma/schema.prisma had them declared) — added here
+  // to match, using the native SubscriptionStatus enum since this schema
+  // uses real enum types throughout, unlike the SQLite dev schema.
   membershipActive Boolean  @default(false)
   membershipTier   String   @default("none")
+  subscriptionStatus   SubscriptionStatus @default(INCOMPLETE)
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
   stripeAccountId       String?
   stripeCustomerId      String?
   stripeSubscriptionId  String?

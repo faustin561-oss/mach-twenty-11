@@ -30,7 +30,7 @@ export default async function MessagesPage() {
         orderBy: { updatedAt: "desc" },
         take: 50,
       }),
-    [] as Awaited<ReturnType<typeof prisma.shipment.findMany>>
+    [] as any // see the note in shipments/[id]/page.tsx — ReturnType<typeof prisma.X> is the base overload, not this query's actual include-aware shape
   );
 
   return (

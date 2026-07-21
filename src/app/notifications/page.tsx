@@ -19,7 +19,7 @@ export default async function NotificationsPage() {
         orderBy: { createdAt: "desc" },
         take: 100,
       }),
-    [] as Awaited<ReturnType<typeof prisma.notification.findMany>>
+    [] as any // see the note in shipments/[id]/page.tsx — ReturnType<typeof prisma.X> is the base overload, not this query's actual shape (harmless here since Notification has no relations, but fixed for consistency)
   );
 
   return (

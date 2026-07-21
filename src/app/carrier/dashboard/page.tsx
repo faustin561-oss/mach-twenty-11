@@ -24,7 +24,7 @@ export default async function CarrierDashboardPage() {
         prisma.carrierProfile.findUnique({ where: { userId }, include: { vehicles: true, drivers: true } }),
         prisma.bid.findMany({ where: { carrierId: userId, won: true }, include: { shipment: true }, orderBy: { createdAt: "desc" } }),
       ]),
-    [null, []] as [Awaited<ReturnType<typeof prisma.carrierProfile.findUnique>>, Awaited<ReturnType<typeof prisma.bid.findMany>>]
+    [null, []] as any // see the note in shipments/[id]/page.tsx — ReturnType<typeof prisma.X> is the base overload, not this query's actual include-aware shape
   );
   const [profile, wonBids] = data;
 

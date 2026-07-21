@@ -81,7 +81,7 @@ export default function CarrierMembershipClient() {
   const isActive = sub?.status === "ACTIVE";
   const isPastDue = sub?.status === "PAST_DUE";
   const isCanceled = sub?.status === "CANCELED" || sub?.status === "UNPAID" || sub?.status === "INCOMPLETE_EXPIRED";
-  const noSubscriptionYet = !sub || sub.status === "none" || sub.status === "NONE";
+  const noSubscriptionYet = !sub || sub.status === "none" || sub.status === "NONE" || sub.status === "INCOMPLETE";
 
   return (
     <div className="mx-auto max-w-2xl">

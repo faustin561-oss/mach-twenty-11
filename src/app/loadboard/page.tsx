@@ -29,7 +29,7 @@ export default async function LoadBoardPage({
         take: 50,
         include: { _count: { select: { bids: true } }, shipper: { select: { name: true } } },
       }),
-    [] as Awaited<ReturnType<typeof prisma.shipment.findMany>>
+    [] as any // see the note in shipments/[id]/page.tsx — ReturnType<typeof prisma.X> is the base overload, not this query's actual include-aware shape
   );
 
   const rows = shipments.map((s) => ({
