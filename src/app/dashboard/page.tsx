@@ -37,7 +37,7 @@ export default async function DashboardPage() {
             {shipments.length === 0 && (
               <p className="text-sm text-black/60">No shipments yet. Post your first load from the Post a Load button above.</p>
             )}
-            {shipments.map((s) => (
+            {shipments.map((s: any) => (
               <Link href={`/shipments/${s.id}`} key={s.id} className="block rounded-lg border border-black/10 bg-white p-5 hover:border-m20amber/40">
                 <div className="flex items-center justify-between">
                   <div className="font-medium">{s.originAddress} → {s.destAddress}</div>

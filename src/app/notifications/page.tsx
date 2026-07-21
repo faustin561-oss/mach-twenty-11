@@ -32,7 +32,7 @@ export default async function NotificationsPage() {
         ) : (
           <div className="mt-6 space-y-2">
             {notifications.length === 0 && <p className="text-sm text-black/50">Nothing yet.</p>}
-            {notifications.map((n) => (
+            {notifications.map((n: any) => (
               <div key={n.id} className={`rounded-lg border border-black/10 bg-white p-4 text-sm ${n.read ? "opacity-60" : ""}`}>
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{n.title}</span>

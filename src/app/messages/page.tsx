@@ -45,7 +45,7 @@ export default async function MessagesPage() {
             {shipments.length === 0 && (
               <p className="text-sm text-black/50">No conversations yet. Messages appear here once you or a counterparty writes on a shipment.</p>
             )}
-            {shipments.map((s) => {
+            {shipments.map((s: any) => {
               const last = s.messages[0];
               return (
                 <Link key={s.id} href={`/shipments/${s.id}`} className="block rounded-lg border border-black/10 bg-white p-4 hover:border-m20amber/40">

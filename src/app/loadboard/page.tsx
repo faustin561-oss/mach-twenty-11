@@ -32,7 +32,7 @@ export default async function LoadBoardPage({
     [] as any // see the note in shipments/[id]/page.tsx — ReturnType<typeof prisma.X> is the base overload, not this query's actual include-aware shape
   );
 
-  const rows = shipments.map((s) => ({
+  const rows = shipments.map((s: any) => ({
     id: s.id,
     mode: s.mode,
     originAddress: s.originAddress,
