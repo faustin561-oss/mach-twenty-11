@@ -45,21 +45,21 @@ export default async function ShipmentDetailPage({ params }: { params: Promise<{
   }
   if (!shipment) notFound();
 
-  const winningBid = shipment.bids.find((b) => b.won);
+  const winningBid = shipment.bids.find((b: any) => b.won);
   const isShipper = shipment.shipperId === userId;
   const isAwardedCarrier = winningBid?.carrierId === userId;
-  const myBid = shipment.bids.find((b) => b.carrierId === userId);
+  const myBid = shipment.bids.find((b: any) => b.carrierId === userId);
   if (!isShipper && !myBid) notFound(); // not a party to this shipment
 
   const sealed = shipment.status === "OPEN_FOR_BIDS";
-  const visibleBids = shipment.bids.filter((b) => !sealed || b.carrierId === userId);
+  const visibleBids = shipment.bids.filter((b: any) => !sealed || b.carrierId === userId);
   const openDispute = shipment.disputes[0]?.status === "OPEN" ? shipment.disputes[0] : null;
 
   // Simple, disclosed anomaly heuristic — not fraud detection, just a
   // flag when a bid sits well below the pack, worth a second look before
   // awarding (e.g. a typo'd rate or a bid that can't actually be honored).
-  const revealedAmounts = visibleBids.filter((b) => b.amount != null).map((b) => b.amount);
-  const sortedAmounts = [...revealedAmounts].sort((a, b) => a - b);
+  const revealedAmounts: number[] = visibleBids.filter((b: any) => b.amount != null).map((b: any) => b.amount);
+  const sortedAmounts = [...revealedAmounts].sort((a: number, b: number) => a - b);
   const median = sortedAmounts.length ? sortedAmounts[Math.floor(sortedAmounts.length / 2)] : null;
 
   return (
@@ -91,7 +91,7 @@ export default async function ShipmentDetailPage({ params }: { params: Promise<{
         <h2 className="text-sm font-semibold uppercase text-black/50">Bids</h2>
         <div className="mt-3 space-y-2">
           {visibleBids.length === 0 && <p className="text-xs text-black/40">{sealed ? "Bids are sealed until the deadline." : "No bids yet."}</p>}
-          {visibleBids.map((b) => {
+          {visibleBids.map((b: any) => {
             const isLowOutlier = median && sortedAmounts.length >= 3 && b.amount < median * 0.6;
             return (
               <div key={b.id} className={`flex items-center justify-between rounded-md border px-3 py-2 text-sm ${b.won ? "border-green-300 bg-green-50" : "border-black/10"}`}>
